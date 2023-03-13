@@ -24,7 +24,7 @@ func main() {
 		log.Fatal().Msgf("%s", err)
 	}
 
-	listings, errs, stop := client.Stream.Listings(&goopla.ListingOptions{Area: "Oxford", Minimum_beds: 2, Maximum_beds: 2}, goopla.StreamInterval(time.Minute*5))
+	listings, errs, stop := client.Stream.Listings(&goopla.ListingOptions{Area: "London", Minimum_beds: 2, Maximum_beds: 2}, goopla.StreamInterval(time.Minute*5))
 	defer stop()
 
 	timer := time.NewTimer(time.Minute * 1000)
