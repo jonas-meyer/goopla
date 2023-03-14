@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"regexp"
 	"time"
 )
 
@@ -61,7 +62,7 @@ type ListingDetails struct {
 	Address          string  `xml:"displayable_address"`
 	Town             string  `xml:"post_town"`
 	PostCode         string  `xml:"outcode"`
-	AvailabilityDate string  `xml:"available_from_display"`
+	AvailabilityDate XMLDate `xml:"available_from_display"`
 	FirstPublished   XMLTime `xml:"first_published_date"`
 	LastPublished    XMLTime `xml:"last_published_date"`
 	Status           string  `xml:"status"`
@@ -96,6 +97,7 @@ type FloorArea struct {
 
 type XMLTime time.Time
 type XMLURL url.URL
+type XMLDate time.Time
 
 func (x *XMLTime) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
 	var content string
@@ -106,10 +108,36 @@ func (x *XMLTime) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
 	return nil
 }
 
+func (x *XMLDate) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
+	var content string
+	if err := d.DecodeElement(&content, &start); err != nil {
+		return err
+	}
+	*x = decodeAvailabilityDate(content)
+	return nil
+}
+
 func decodeDate(s string) XMLTime {
 	dateLayout := "2006-01-02 15:04:05"
 	t, _ := time.Parse(dateLayout, s)
 	return XMLTime(t)
+}
+
+func decodeAvailabilityDate(s string) XMLDate {
+	if s == "Available immediately" {
+		return XMLDate(time.Now())
+	}
+	dateLayout := "2 Jan 2006"
+	re := regexp.MustCompile(`\d+(?:st|nd|rd|th) \w+ \d{4}`)
+	dateString := re.FindString(s)
+	dateStringSuffixRemoved := regexp.MustCompile(`(?P<day>\d+)(?P<suffix>st|nd|rd|th)`).ReplaceAllString(dateString, "${day}")
+	date, _ := time.Parse(dateLayout, dateStringSuffixRemoved)
+	return XMLDate(date)
+}
+
+func (x *XMLDate) UnmarshalXMLAttr(attr xml.Attr) error {
+	*x = decodeAvailabilityDate(attr.Value)
+	return nil
 }
 
 func (x *XMLTime) UnmarshalXMLAttr(attr xml.Attr) error {
