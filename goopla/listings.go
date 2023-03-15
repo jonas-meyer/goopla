@@ -2,7 +2,6 @@ package goopla
 
 import (
 	"context"
-	"encoding/json"
 	"encoding/xml"
 	"fmt"
 	"net/http"
@@ -96,9 +95,15 @@ type FloorArea struct {
 	Value string `xml:"value"`
 }
 
-type XMLTime time.Time
-type XMLURL url.URL
-type XMLDate time.Time
+type XMLTime struct {
+	time.Time
+}
+type XMLURL struct {
+	url.URL
+}
+type XMLDate struct {
+	time.Time
+}
 
 func (x *XMLTime) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
 	var content string
@@ -121,19 +126,19 @@ func (x *XMLDate) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
 func decodeDate(s string) XMLTime {
 	dateLayout := "2006-01-02 15:04:05"
 	t, _ := time.Parse(dateLayout, s)
-	return XMLTime(t)
+	return XMLTime{t}
 }
 
 func decodeAvailabilityDate(s string) XMLDate {
 	if s == "Available immediately" {
-		return XMLDate(time.Now())
+		return XMLDate{time.Now()}
 	}
 	dateLayout := "2 Jan 2006"
 	re := regexp.MustCompile(`\d+(?:st|nd|rd|th) \w+ \d{4}`)
 	dateString := re.FindString(s)
 	dateStringSuffixRemoved := regexp.MustCompile(`(?P<day>\d+)(?P<suffix>st|nd|rd|th)`).ReplaceAllString(dateString, "${day}")
 	date, _ := time.Parse(dateLayout, dateStringSuffixRemoved)
-	return XMLDate(date)
+	return XMLDate{date}
 }
 
 func (x *XMLDate) UnmarshalXMLAttr(attr xml.Attr) error {
@@ -157,52 +162,11 @@ func (u *XMLURL) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
 
 func decodeURL(s string) XMLURL {
 	url, _ := url.Parse(s)
-	return XMLURL(*url)
+	return XMLURL{*url}
 }
 
 func (u *XMLURL) UnmarshalXMLAttr(attr xml.Attr) error {
 	*u = decodeURL(attr.Value)
-	return nil
-}
-
-func (d *ListingDetails) MarshalJSON() ([]byte, error) {
-	type Alias ListingDetails
-	return json.Marshal(&struct {
-		ListingID        string `json:"ListingID"`
-		FirstPublished   string `json:"FirstPublished"`
-		LastPublished    string `json:"LastPublished"`
-		AvailabilityDate string `json:"AvailabilityDate"`
-		*Alias
-	}{
-		ListingID:        d.ListingID,
-		FirstPublished:   time.Time(d.FirstPublished).Format(time.RFC3339),
-		LastPublished:    time.Time(d.LastPublished).Format(time.RFC3339),
-		AvailabilityDate: time.Time(d.AvailabilityDate).Format(time.RFC3339),
-		Alias:            (*Alias)(d),
-	})
-}
-
-func (d *ListingDetails) UnmarshalJSON(data []byte) error {
-	type Alias ListingDetails
-	aux := &struct {
-		ListingID        string `json:"ListingID"`
-		FirstPublished   string `json:"FirstPublished"`
-		LastPublished    string `json:"LastPublished"`
-		AvailabilityDate string `json:"AvailabilityDate"`
-		*Alias
-	}{
-		Alias: (*Alias)(d),
-	}
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return err
-	}
-	d.ListingID = aux.ListingID
-	firstPublished, _ := time.Parse(time.RFC3339, aux.FirstPublished)
-	LastPublished, _ := time.Parse(time.RFC3339, aux.LastPublished)
-	AvailabilityDate, _ := time.Parse(time.RFC3339, aux.AvailabilityDate)
-	d.FirstPublished = XMLTime(firstPublished)
-	d.LastPublished = XMLTime(LastPublished)
-	d.AvailabilityDate = XMLDate(AvailabilityDate)
 	return nil
 }
 
