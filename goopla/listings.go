@@ -2,6 +2,7 @@ package goopla
 
 import (
 	"context"
+	"encoding/json"
 	"encoding/xml"
 	"fmt"
 	"net/http"
@@ -161,6 +162,47 @@ func decodeURL(s string) XMLURL {
 
 func (u *XMLURL) UnmarshalXMLAttr(attr xml.Attr) error {
 	*u = decodeURL(attr.Value)
+	return nil
+}
+
+func (d *ListingDetails) MarshalJSON() ([]byte, error) {
+	type Alias ListingDetails
+	return json.Marshal(&struct {
+		ListingID        string `json:"ListingID"`
+		FirstPublished   string `json:"FirstPublished"`
+		LastPublished    string `json:"LastPublished"`
+		AvailabilityDate string `json:"AvailabilityDate"`
+		*Alias
+	}{
+		ListingID:        d.ListingID,
+		FirstPublished:   time.Time(d.FirstPublished).Format(time.RFC3339),
+		LastPublished:    time.Time(d.LastPublished).Format(time.RFC3339),
+		AvailabilityDate: time.Time(d.AvailabilityDate).Format(time.RFC3339),
+		Alias:            (*Alias)(d),
+	})
+}
+
+func (d *ListingDetails) UnmarshalJSON(data []byte) error {
+	type Alias ListingDetails
+	aux := &struct {
+		ListingID        string `json:"ListingID"`
+		FirstPublished   string `json:"FirstPublished"`
+		LastPublished    string `json:"LastPublished"`
+		AvailabilityDate string `json:"AvailabilityDate"`
+		*Alias
+	}{
+		Alias: (*Alias)(d),
+	}
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	d.ListingID = aux.ListingID
+	firstPublished, _ := time.Parse(time.RFC3339, aux.FirstPublished)
+	LastPublished, _ := time.Parse(time.RFC3339, aux.LastPublished)
+	AvailabilityDate, _ := time.Parse(time.RFC3339, aux.AvailabilityDate)
+	d.FirstPublished = XMLTime(firstPublished)
+	d.LastPublished = XMLTime(LastPublished)
+	d.AvailabilityDate = XMLDate(AvailabilityDate)
 	return nil
 }
 
